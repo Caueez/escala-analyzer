@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101826">
+  <title>Escala Visual</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div><div class="brand-name">escala<span>visual</span></div><div class="brand-caption">PLANEJAMENTO OPERACIONAL</div></div>
+      </div>
+      <div class="project-picker">
+        <div class="eyebrow">PROJETO ATUAL</div>
+        <div id="sidebarProjectName" class="project-name">Carregando projeto…</div>
+        <div class="project-state"><span class="state-dot"></span><span id="saveState">Carregando</span></div>
+      </div>
+      <nav class="main-nav" aria-label="Navegação principal">
+        <button class="nav-item active" data-view="timeline"><span class="nav-icon">▥</span><span>Linha do tempo</span></button>
+        <button class="nav-item" data-view="analysis"><span class="nav-icon">◫</span><span>Análise anual</span></button>
+        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Configurações</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-tip-icon">i</div>
+        <div><strong>Feito para planejar</strong><p>Edite o ciclo, confira a cobertura e encontre os pontos que precisam de revisão.</p></div>
+      </div>
+      <div class="version-label">VERSÃO 0.1.0 · LOCAL</div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="breadcrumb"><span>Planejamento</span><span class="breadcrumb-separator">/</span><strong id="breadcrumbTitle">Linha do tempo</strong></div>
+        <div class="topbar-actions">
+          <button id="exportCsvButton" class="button button-quiet" title="Exportar a cobertura anual em CSV"><span>↧</span> Exportar CSV</button>
+          <button id="settingsButton" class="icon-button" aria-label="Abrir configurações" title="Configurações">⚙</button>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+        <section id="view-timeline" class="view active-view">
+          <div class="page-heading heading-with-actions">
+            <div>
+              <div class="eyebrow accent-eyebrow">EDITOR DE ESCALAS</div>
+              <h1>Monte a escala. <span>Enxergue o impacto.</span></h1>
+              <p class="page-description">Organize os grupos numa linha do tempo e veja como cada alteração afeta as folgas e a cobertura do turno.</p>
+            </div>
+            <button id="addGroupButton" class="button button-primary"><span class="button-plus">＋</span> Novo grupo</button>
+          </div>
+
+          <div class="notice notice-info" id="demoNotice">
+            <span class="notice-icon">i</span>
+            <div><strong>Modelo demonstrativo</strong><p>Os 101 funcionários, os grupos, os ciclos e a demanda inicial são estimativas editáveis — substitua pelos números reais antes de tomar decisões.</p></div>
+            <button id="dismissDemoNotice" class="notice-close" aria-label="Fechar aviso">×</button>
+          </div>
+
+          <div class="stats-grid" id="timelineStats">
+            <article class="stat-card"><div class="stat-top"><span>Funcionários nos grupos</span><span class="stat-symbol symbol-blue">♙</span></div><div class="stat-value" id="statPeople">—</div><div class="stat-foot">Soma dos grupos cadastrados</div></article>
+            <article class="stat-card"><div class="stat-top"><span>Grupos configurados</span><span class="stat-symbol symbol-violet">▤</span></div><div class="stat-value" id="statGroups">—</div><div class="stat-foot">Distribuídos por turno</div></article>
+            <article class="stat-card"><div class="stat-top"><span>Turnos/dia com déficit no mês</span><span class="stat-symbol symbol-orange">!</span></div><div class="stat-value" id="statDeficitDays">—</div><div class="stat-foot" id="statDeficitFoot">Soma por turno e dia</div></article>
+            <article class="stat-card"><div class="stat-top"><span>Maior falta num turno</span><span class="stat-symbol symbol-red">↘</span></div><div class="stat-value" id="statWorstDeficit">—</div><div class="stat-foot">Pessoas abaixo da demanda</div></article>
+          </div>
+
+          <section class="panel timeline-panel">
+            <div class="panel-heading timeline-heading">
+              <div><div class="section-title">Calendário de trabalho</div><div class="section-subtitle">Arraste uma folga para outro dia ou clique num dia para alternar trabalho/descanso.</div></div>
+              <div class="timeline-controls">
+                <div class="month-control"><button id="prevMonthButton" class="month-arrow" aria-label="Mês anterior">‹</button><select id="monthSelect" aria-label="Mês"></select><button id="nextMonthButton" class="month-arrow" aria-label="Próximo mês">›</button></div>
+                <span id="yearLabel" class="year-pill">2027</span>
+              </div>
+            </div>
+            <div class="timeline-legend"><span><i class="legend-work"></i> Trabalho</span><span><i class="legend-rest"></i> Folga</span><span><i class="legend-exception"></i> Ajuste manual</span><span class="legend-help">Arrastar uma folga cria um ajuste pontual na data.</span></div>
+            <div id="timelineContainer" class="timeline-container"><div class="loading-state">Preparando a linha do tempo…</div></div>
+            <div class="timeline-footer"><span id="timelineRangeLabel">—</span><span>Os ajustes manuais são salvos localmente neste projeto.</span></div>
+          </section>
+          <div class="under-timeline-note"><span class="note-check">✓</span><span>O ciclo continua sendo a base. Uma alteração manual vale para a data escolhida; o analisador verifica o ano inteiro e sinaliza as consequências.</span></div>
+        </section>
+
+        <section id="view-analysis" class="view">
+          <div class="page-heading">
+            <div><div class="eyebrow accent-eyebrow">VALIDAÇÃO DO CALENDÁRIO</div><h1>Análise <span id="analysisYearHeading">anual</span></h1><p class="page-description">Confira os déficits de cobertura e os parâmetros que a escala não atende, mês a mês.</p></div>
+            <button id="analysisRefreshButton" class="button button-secondary">↻ Recalcular análise</button>
+          </div>
+          <div class="notice notice-warning"><span class="notice-icon">!</span><div><strong>Resultado condicionado às regras configuradas</strong><p id="analysisDisclaimer">A análise não é um parecer jurídico. Valide o cenário aplicável, a convenção coletiva e as regras específicas da categoria antes de aprovar uma escala.</p></div></div>
+          <div class="analysis-metrics" id="analysisStats"></div>
+          <section class="panel analysis-panel"><div class="panel-heading"><div><div class="section-title">Resumo por mês</div><div class="section-subtitle">Déficits de cobertura contam combinações turno/dia; não apenas datas únicas.</div></div><span class="small-tag" id="profileTag">Cenário configurado</span></div><div class="table-wrap"><table class="data-table" id="monthlyTable"><thead><tr><th>Mês</th><th>Dias/turnos com déficit</th><th>Maior falta num turno</th><th>Problemas de regras</th><th>Status</th></tr></thead><tbody></tbody></table></div></section>
+          <section class="panel issues-panel"><div class="panel-heading"><div><div class="section-title">Pontos para revisar</div><div class="section-subtitle">Lista de achados do ano, priorizando a falta de cobertura.</div></div><div class="filter-control"><label for="issueFilter">Mostrar</label><select id="issueFilter"><option value="all">Todos os achados</option><option value="coverage">Cobertura</option><option value="rules">Regras configuradas</option></select></div></div><div id="issuesList" class="issues-list"></div><div class="issues-footer" id="issuesFooter"></div></section>
+        </section>
+
+        <section id="view-settings" class="view">
+          <div class="page-heading"><div><div class="eyebrow accent-eyebrow">PARÂMETROS DO PROJETO</div><h1>Configurações <span>da escala</span></h1><p class="page-description">Edite a demanda de cada turno, a jornada prevista e os limites usados pelo analisador.</p></div><button id="saveSettingsButton" class="button button-primary">Salvar parâmetros</button></div>
+          <div class="notice notice-warning"><span class="notice-icon">!</span><div><strong>Parâmetros legais precisam de validação</strong><p>Os perfis são cenários de cálculo, não confirmação de vigência legal. A publicação da mudança constitucional e o acordo/convenção coletiva aplicável devem ser conferidos separadamente.</p></div></div>
+          <form id="settingsForm" class="settings-layout">
+            <section class="panel settings-panel"><div class="panel-heading"><div><div class="section-title">Projeto e período</div><div class="section-subtitle">O calendário anual analisado.</div></div></div><div class="form-grid"><div class="field field-span-2"><label for="projectName">Nome do projeto</label><input id="projectName" name="projectName" maxlength="120" required></div><div class="field"><label for="projectYear">Ano da análise</label><input id="projectYear" name="projectYear" type="number" min="2000" max="2100" required></div><div class="field"><label for="ruleProfile">Perfil de cálculo</label><select id="ruleProfile" name="ruleProfile"><option value="baseline">Referência base · 44 h / 1 descanso</option><option value="transition">Transição proposta · 42 h / 2 descansos</option><option value="target">Meta proposta · 40 h / 2 descansos</option></select></div></div><div class="field field-top-gap"><label for="projectNotes">Notas e premissas</label><textarea id="projectNotes" name="projectNotes" rows="3"></textarea></div></section>
+            <section class="panel settings-panel"><div class="panel-heading"><div><div class="section-title">Parâmetros de análise</div><div class="section-subtitle">Podem ser ajustados para testar diferentes cenários.</div></div></div><div class="form-grid rules-grid"><div class="field"><label for="weeklyMaxHours">Máximo de horas em 7 dias</label><div class="input-unit"><input id="weeklyMaxHours" type="number" min="0" max="168" step="0.5" required><span>h</span></div></div><div class="field"><label for="minRestRolling">Mínimo de folgas em 7 dias corridos</label><input id="minRestRolling" type="number" min="0" max="7" step="1" required></div><div class="field"><label for="minSundays">Domingos de folga por mês</label><input id="minSundays" type="number" min="0" max="5" step="1" required></div><div class="field"><label for="minMonthlyRest">Folgas mínimas no mês</label><input id="minMonthlyRest" type="number" min="0" max="31" step="1" required></div><div class="field"><label for="maxConsecutive">Máximo de dias seguidos de trabalho</label><input id="maxConsecutive" type="number" min="1" max="31" step="1" required></div><div class="field checkbox-field"><label class="checkbox-label"><input id="checkMonthlyRest" type="checkbox"><span>Verificar mínimo de folgas no mês</span></label><small>Premissa que precisa ser validada para o caso real.</small></div></div><div class="profile-explainer" id="profileExplainer"></div></section>
+            <section class="panel settings-panel shift-settings-panel"><div class="panel-heading"><div><div class="section-title">Demanda por turno</div><div class="section-subtitle">Quantas pessoas precisam estar trabalhando em cada dia da semana.</div></div><div class="button-row"><button type="button" id="addShiftButton" class="button button-quiet">＋ Adicionar turno</button></div></div><div id="shiftSettingsList" class="shift-settings-list"></div></section>
+            <section class="panel settings-panel portability-panel"><div class="panel-heading"><div><div class="section-title">Backup e portabilidade</div><div class="section-subtitle">O projeto fica em arquivo local; exporte uma cópia antes de experimentar mudanças grandes.</div></div></div><div class="portability-actions"><button type="button" id="exportJsonButton" class="button button-secondary">Exportar projeto JSON</button><label class="button button-secondary file-label" for="importJsonInput">Importar projeto JSON</label><input id="importJsonInput" type="file" accept="application/json,.json" hidden><button type="button" id="resetProjectButton" class="button button-danger-quiet">Restaurar exemplo</button></div><div class="muted-small">Local do arquivo padrão: <code>data/project.json</code>. O backup JSON permite restaurar grupos, ciclos, regras e ajustes manuais.</div></section>
+          </form>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="groupDialog" class="modal-backdrop" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="groupDialogTitle">
+      <div class="modal-header"><div><div class="eyebrow accent-eyebrow">CONFIGURAÇÃO DO GRUPO</div><h2 id="groupDialogTitle">Novo grupo</h2></div><button class="icon-button" data-close-modal="groupDialog" aria-label="Fechar">×</button></div>
+      <form id="groupForm"><input id="groupId" type="hidden"><div class="form-grid"><div class="field field-span-2"><label for="groupName">Nome do grupo</label><input id="groupName" maxlength="80" required placeholder="Ex.: Grupo A"></div><div class="field"><label for="groupShift">Turno</label><select id="groupShift" required></select></div><div class="field"><label for="groupEmployees">Quantidade de pessoas</label><input id="groupEmployees" type="number" min="0" max="100000" step="1" required></div><div class="field"><label for="groupWorkDays">Dias trabalhados no ciclo</label><input id="groupWorkDays" type="number" min="1" max="31" step="1" required></div><div class="field"><label for="groupRestDays">Dias de folga no ciclo</label><input id="groupRestDays" type="number" min="1" max="31" step="1" required></div><div class="field field-span-2"><label for="groupAnchor">Data inicial do ciclo</label><input id="groupAnchor" type="date" required><small>Essa data é considerada o primeiro dia de trabalho do ciclo.</small></div></div><div class="cycle-preview" id="cyclePreview"></div><div class="modal-footer"><button type="button" id="deleteGroupButton" class="button button-danger-quiet" hidden>Excluir grupo</button><div class="modal-footer-spacer"></div><button type="button" class="button button-secondary" data-close-modal="groupDialog">Cancelar</button><button type="submit" class="button button-primary">Salvar grupo</button></div></form>
+    </section>
+  </div>
+
+  <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+</body>
+</html>
