@@ -11,18 +11,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from escala_analyzer.domain.analyzer import analyze_project
+from escala_analyzer.container import container
 from escala_analyzer.domain.models import ProjectState
-from escala_analyzer.infrastructure.json_repository import JsonProjectRepository
 
 WEB_DIR = Path(__file__).parent / "web"
-repository = JsonProjectRepository()
 
 app = FastAPI(
     title="Escala Visual",
     version="0.1.0",
     description="Editor local de escalas com linha do tempo e análise anual configurável.",
 )
+
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 
 
@@ -39,7 +38,7 @@ def health() -> dict[str, str]:
 @app.get("/api/project", response_model=ProjectState)
 def get_project() -> ProjectState:
     try:
-        return repository.load()
+        return container.load_project.execute()
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -47,43 +46,69 @@ def get_project() -> ProjectState:
 @app.put("/api/project", response_model=ProjectState)
 def save_project(project: ProjectState) -> ProjectState:
     try:
-        repository.save(project)
+        return container.save_project.execute(project)
     except (OSError, RuntimeError) as exc:
-        raise HTTPException(status_code=500, detail=f"Não foi possível salvar o projeto: {exc}") from exc
-    return project
+        raise HTTPException(
+            status_code=500,
+            detail=f"Não foi possível salvar o projeto: {exc}",
+        ) from exc
 
 
 @app.post("/api/project/reset", response_model=ProjectState)
 def reset_project() -> ProjectState:
     try:
-        return repository.reset()
-    except OSError as exc:
-        raise HTTPException(status_code=500, detail=f"Não foi possível restaurar o exemplo: {exc}") from exc
+        return container.reset_project.execute()
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Não foi possível restaurar o exemplo: {exc}",
+        ) from exc
 
 
 @app.post("/api/analyze")
 def analyze(project: ProjectState) -> dict[str, Any]:
     try:
-        return analyze_project(project)
+        return container.analyze_project.execute(project)
     except (ValueError, KeyError) as exc:
-        raise HTTPException(status_code=422, detail=f"Falha ao analisar o projeto: {exc}") from exc
+        raise HTTPException(
+            status_code=422,
+            detail=f"Falha ao analisar o projeto: {exc}",
+        ) from exc
 
 
 @app.get("/api/export.csv")
 def export_csv() -> Response:
     """Exporta a cobertura prevista por data e turno, em CSV compatível com Excel."""
     try:
-        project = repository.load()
-        result = analyze_project(project)
-    except (RuntimeError, ValueError) as exc:
+        project = container.load_project.execute()
+        result = container.analyze_project.execute(project)
+    except (RuntimeError, ValueError, KeyError) as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     output = io.StringIO(newline="")
     writer = csv.writer(output, delimiter=";")
     writer.writerow(
-        ["Data", "Dia da semana", "Turno", "Necessário", "Previsto na escala", "Déficit", "Sobra"]
+        [
+            "Data",
+            "Dia da semana",
+            "Turno",
+            "Necessário",
+            "Previsto na escala",
+            "Déficit",
+            "Sobra",
+        ]
     )
-    weekday_names = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
+
+    weekday_names = [
+        "segunda",
+        "terça",
+        "quarta",
+        "quinta",
+        "sexta",
+        "sábado",
+        "domingo",
+    ]
+
     for day in result["coverage_by_day"]:
         for shift in day["shifts"]:
             writer.writerow(
@@ -99,8 +124,13 @@ def export_csv() -> Response:
             )
 
     csv_bytes = ("\ufeff" + output.getvalue()).encode("utf-8")
+
     return Response(
         content=csv_bytes,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="escala-{project.year}.csv"'},
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="escala-{project.year}.csv"'
+            )
+        },
     )

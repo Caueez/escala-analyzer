@@ -1,7 +1,12 @@
 from datetime import date
 
-from escala_visual.domain.analyzer import analyze_project, is_working
-from escala_visual.domain.models import ProjectState, RuleSettings, ScheduleGroup, Shift
+from escala_analyzer.domain.models import (
+    ProjectState,
+    RuleSettings,
+    ScheduleGroup,
+    Shift,
+)
+from escala_analyzer.domain.project_analyzer import analyze_project, is_working
 
 
 def small_project(group: ScheduleGroup) -> ProjectState:
