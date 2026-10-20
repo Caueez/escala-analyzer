@@ -1,15 +1,19 @@
-
 """Fachada pública para análise de escalas."""
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import date
-from typing import Any
 
-from .coverage_analyzer import CoverageAnalyzer
-from .models import ProjectState
-from .schedule_calendar import ScheduleCalendar
-from .schedule_rules_analyzer import ScheduleRulesAnalyzer
+from escala_analyzer.domain.analysis.coverage_analyzer import CoverageAnalyzer
+from escala_analyzer.domain.analysis.schedule_rules_analyzer import ScheduleRulesAnalyzer
+from escala_analyzer.domain.calendar.schedule_calendar import ScheduleCalendar
+from escala_analyzer.domain.contracts.analysis_contracts import (
+    MonthlyShiftSummary,
+    MonthlySummary,
+    ProjectAnalysis,
+)
+from escala_analyzer.domain.entities import ProjectState, ScheduleGroup
 
 
 class ProjectAnalyzer:
@@ -23,7 +27,7 @@ class ProjectAnalyzer:
         self._coverage_analyzer = coverage_analyzer or CoverageAnalyzer()
         self._rules_analyzer = rules_analyzer or ScheduleRulesAnalyzer()
 
-    def analyze(self, project: ProjectState) -> dict[str, Any]:
+    def analyze(self, project: ProjectState, include_details: bool = True) -> ProjectAnalysis:
         year_start = date(project.year, 1, 1)
         year_end = date(project.year, 12, 31)
         calendar_dates = ScheduleCalendar.year_dates(project.year)
@@ -40,6 +44,7 @@ class ProjectAnalyzer:
             year_start=year_start,
             year_end=year_end,
             shifts=shifts,
+            include_details=include_details,
         )
 
         coverage_by_day = coverage_result["coverage_by_day"]
@@ -49,16 +54,14 @@ class ProjectAnalyzer:
 
         monthly_coverage_counts = coverage_result["monthly_coverage_counts"]
         monthly_peak_deficit = coverage_result["monthly_peak_deficit"]
-        monthly_max_shortage_by_shift = (
-            coverage_result["monthly_max_shortage_by_shift"]
-        )
+        monthly_max_shortage_by_shift = coverage_result["monthly_max_shortage_by_shift"]
         monthly_required = coverage_result["monthly_required"]
         monthly_scheduled = coverage_result["monthly_scheduled"]
 
-        monthly_summary: list[dict[str, Any]] = []
+        monthly_summary: list[MonthlySummary] = []
 
         for month in range(1, 13):
-            shift_rows = []
+            shift_rows: list[MonthlyShiftSummary] = []
 
             for shift in project.shifts:
                 shift_rows.append(
@@ -67,9 +70,7 @@ class ProjectAnalyzer:
                         "shift_name": shift.name,
                         "required_staff_days": monthly_required[(month, shift.id)],
                         "scheduled_staff_days": monthly_scheduled[(month, shift.id)],
-                        "max_daily_deficit": monthly_max_shortage_by_shift[
-                            (month, shift.id)
-                        ],
+                        "max_daily_deficit": monthly_max_shortage_by_shift[(month, shift.id)],
                     }
                 )
 
@@ -84,36 +85,43 @@ class ProjectAnalyzer:
             )
 
         issues = coverage_issues + rule_issues
-        months_with_issues = sorted(
-            {
-                issue["month"]
-                for issue in issues
-                if issue.get("month")
-            }
-        )
+        months_with_issues = sorted({month for issue in issues if (month := issue.get("month"))})
 
         return {
             "year": project.year,
             "days_in_year": len(calendar_dates),
             "people_total": sum(
-                group.employee_count for group in project.groups
+                group.employee_count
+                if group.rotation_shift_ids
+                else sum(group.allocations.values())
+                if group.allocations
+                else group.employee_count
+                for group in project.groups
             ),
             "group_count": len(project.groups),
             "shift_count": len(project.shifts),
             "coverage_gap_count": len(coverage_issues),
-            "days_with_any_coverage_gap": len(
-                {item["date"] for item in coverage_issues}
-            ),
+            "days_with_any_coverage_gap": len({item.get("date", "") for item in coverage_issues}),
             "peak_single_shift_deficit": max(
-                (item["deficit"] for item in coverage_issues),
+                (item.get("deficit", 0) for item in coverage_issues),
                 default=0,
             ),
             "rule_issue_count": len(rule_issues),
             "months_with_issues": months_with_issues,
-            "rules": project.rules.model_dump(mode="json"),
+            "rules": asdict(project.rules),
+            "rule_periods": [
+                {
+                    "effective_from": period.effective_from.isoformat(),
+                    "label": period.label,
+                    "source": period.source,
+                    "rules": asdict(period.rules),
+                }
+                for period in project.rule_periods
+            ],
             "coverage_by_day": coverage_by_day,
             "coverage_issues": coverage_issues,
             "group_monthly": group_monthly,
+            "group_annual": rules_result["group_annual"],
             "monthly_summary": monthly_summary,
             "rule_issues": rule_issues,
             "issues": issues,
@@ -126,13 +134,11 @@ class ProjectAnalyzer:
         }
 
 
-def analyze_project(project: ProjectState) -> dict[str, Any]:
+def analyze_project(project: ProjectState) -> ProjectAnalysis:
     """Mantém a função pública usada pela API e pelos demais módulos."""
     return ProjectAnalyzer().analyze(project)
 
 
-def is_working(group: Any, day: date) -> bool:
+def is_working(group: ScheduleGroup, day: date) -> bool:
     """Mantém compatibilidade com imports anteriores."""
-    from .schedule_calendar import ScheduleCalendar
-
     return ScheduleCalendar.is_working(group, day)

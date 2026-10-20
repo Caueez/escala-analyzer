@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from .models import ProjectState, RuleSettings, ScheduleGroup, Shift
+from escala_analyzer.domain.entities import ProjectState, RuleSettings, ScheduleGroup, Shift
 
 WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 

@@ -1,5 +1,5 @@
 from escala_analyzer.application.ports.project_repository import ProjectRepository
-from escala_analyzer.domain.models import ProjectState
+from escala_analyzer.domain.entities import ProjectState
 
 
 class ResetProject:

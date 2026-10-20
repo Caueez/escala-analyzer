@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from escala_analyzer.domain.models import ProjectState
+from escala_analyzer.domain.entities import ProjectState
 
 
 class ProjectRepository(Protocol):

@@ -10,3 +10,15 @@ wheels/
 .venv
 
 .env
+
+# Local company projects and atomic save files
+/data/*.json
+/data/*.json.tmp
+*.db
+*.db-shm
+*.db-wal
+.env.*
+!.env.example
+/backups/
+/data/*.tmp
+/data/.*.tmp

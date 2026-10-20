@@ -1,12 +1,12 @@
 from datetime import date
 
-from escala_analyzer.domain.models import (
+from escala_analyzer.domain.analysis.project_analyzer import analyze_project, is_working
+from escala_analyzer.domain.entities import (
     ProjectState,
     RuleSettings,
     ScheduleGroup,
     Shift,
 )
-from escala_analyzer.domain.project_analyzer import analyze_project, is_working
 
 
 def small_project(group: ScheduleGroup) -> ProjectState:
@@ -98,8 +98,7 @@ def test_analyzer_counts_group_monthly_sunday_rest() -> None:
     project.rules.min_sundays_off_per_month = 1
     result = analyze_project(project)
     january = next(
-        item for item in result["group_monthly"]
-        if item["group_id"] == "g1" and item["month"] == 1
+        item for item in result["group_monthly"] if item["group_id"] == "g1" and item["month"] == 1
     )
     assert january["sundays_off"] >= 2
     assert not any(

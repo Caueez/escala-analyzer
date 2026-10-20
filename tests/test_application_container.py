@@ -1,11 +1,10 @@
-
 from datetime import date
 
 from escala_analyzer.application.use_cases.analyze_project import AnalyzeProject
 from escala_analyzer.container import ApplicationContainer
-from escala_analyzer.domain.coverage_analyzer import CoverageAnalyzer
-from escala_analyzer.domain.models import ProjectState, ScheduleGroup, Shift
-from escala_analyzer.domain.schedule_rules_analyzer import ScheduleRulesAnalyzer
+from escala_analyzer.domain.analysis.coverage_analyzer import CoverageAnalyzer
+from escala_analyzer.domain.analysis.schedule_rules_analyzer import ScheduleRulesAnalyzer
+from escala_analyzer.domain.entities import ProjectState, ScheduleGroup, Shift
 
 
 class FakeProjectRepository:

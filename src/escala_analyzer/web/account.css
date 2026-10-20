@@ -1,0 +1,12 @@
+.identity-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #f2f4f8; color: #182235; }
+.identity-card { width: min(100%, 440px); background: white; padding: 36px; border: 1px solid #dde3ed; border-radius: 16px; box-shadow: 0 12px 40px #17223b0d; }
+.identity-wide { width: min(100%, 680px); }
+.identity-card form { display: grid; gap: 16px; margin: 24px 0; }
+.identity-card label { display: grid; gap: 6px; font-weight: 600; }
+.identity-card input, .identity-card select { width: 100%; padding: 12px; border: 1px solid #c7d0df; border-radius: 7px; font: inherit; }
+.identity-card h1 { font-size: 29px; margin: 20px 0 12px; }
+.identity-card h2 { margin: 28px 0 12px; font-size: 21px; }
+.identity-card p { line-height: 1.6; }
+.identity-card #authError { color: #b42318; }
+.identity-card .muted { color: #64748b; font-size: 13px; }
+.user-entry { padding: 12px 0; border-bottom: 1px solid #e0e6ee; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }

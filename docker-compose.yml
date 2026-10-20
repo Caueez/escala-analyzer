@@ -1,8 +1,134 @@
+x-backend: &backend
+  build: .
+  image: escala-visual:0.2.0rc1
+  environment: &runtime-environment
+    ESCALA_MODE: saas
+    ESCALA_ENVIRONMENT: ${ESCALA_ENVIRONMENT:-production}
+    ESCALA_DATABASE_URL: ${ESCALA_DATABASE_URL:?generate .env first}
+    ESCALA_BROKER_URL: ${ESCALA_BROKER_URL:?generate .env first}
+    ESCALA_PUBLIC_ORIGIN: ${ESCALA_PUBLIC_ORIGIN:?configure public origin}
+    ESCALA_ALLOWED_HOSTS: ${ESCALA_ALLOWED_HOSTS:?configure allowed hosts}
+    ESCALA_SECURE_COOKIES: ${ESCALA_SECURE_COOKIES:-true}
+    ESCALA_SESSION_HOURS: ${ESCALA_SESSION_HOURS:-8}
+    ESCALA_SESSION_IDLE_MINUTES: ${ESCALA_SESSION_IDLE_MINUTES:-60}
+    ESCALA_MAX_ACTIVE_JOBS: ${ESCALA_MAX_ACTIVE_JOBS:-4}
+    ESCALA_JOB_RETENTION_DAYS: ${ESCALA_JOB_RETENTION_DAYS:-7}
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  depends_on:
+    db: {condition: service_healthy}
+    broker: {condition: service_healthy}
+    migrate: {condition: service_completed_successfully}
 
 services:
-  app:
+  db:
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?generate .env first}
+      POSTGRES_USER: ${POSTGRES_USER:?generate .env first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?generate .env first}
+      ESCALA_DB_PASSWORD: ${ESCALA_DB_PASSWORD:?generate .env first}
+      ESCALA_MIGRATOR_PASSWORD: ${ESCALA_MIGRATOR_PASSWORD:?generate .env first}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres/001_roles.sh:/docker-entrypoint-initdb.d/001_roles.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    mem_limit: 512m
+
+  broker:
+    hostname: broker
+    image: rabbitmq:4-alpine@sha256:8668a6ed4a878a6619213d9d5721dd4983ecb662312fe233816e1d1ff8a96753
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?generate .env first}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?generate .env first}
+    volumes: [rabbitmq_data:/var/lib/rabbitmq]
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    mem_limit: 512m
+
+  migrate:
     build: .
-    ports:
-      - "8000:8000"
-    expose:
-      - 8000
+    image: escala-visual:0.2.0rc1
+    environment:
+      <<: *runtime-environment
+      ESCALA_DATABASE_URL: ${ESCALA_MIGRATION_DATABASE_URL:?configure migration user}
+    command: [alembic, upgrade, head]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  app:
+    <<: *backend
+    ports: ["127.0.0.1:${ESCALA_PORT:-8000}:8000"]
+    mem_limit: 512m
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
+      interval: 20s
+      timeout: 8s
+      retries: 5
+      start_period: 15s
+
+  analysis-worker:
+    <<: *backend
+    command: [celery, -A, escala_analyzer.infrastructure.messaging.celery_app:celery_app, worker, -Q, analysis, --concurrency=1, --loglevel=INFO]
+    mem_limit: 768m
+    stop_grace_period: 200s
+    healthcheck:
+      test: [CMD-SHELL, 'celery -A escala_analyzer.infrastructure.messaging.celery_app:celery_app inspect ping -d "celery@$${HOSTNAME}" --timeout=5 | grep -q pong']
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 20s
+
+  optimization-worker:
+    <<: *backend
+    command: [celery, -A, escala_analyzer.infrastructure.messaging.celery_app:celery_app, worker, -Q, optimization, --concurrency=1, --loglevel=INFO]
+    mem_limit: 1g
+    stop_grace_period: 200s
+    healthcheck:
+      test: [CMD-SHELL, 'celery -A escala_analyzer.infrastructure.messaging.celery_app:celery_app inspect ping -d "celery@$${HOSTNAME}" --timeout=5 | grep -q pong']
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 20s
+
+  dispatcher:
+    <<: *backend
+    command: [python, -m, escala_analyzer.infrastructure.messaging.dispatcher]
+    mem_limit: 256m
+
+  edge:
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    profiles: [edge]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [app]
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  caddy_data:
+  caddy_config:

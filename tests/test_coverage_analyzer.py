@@ -1,8 +1,7 @@
-
 from datetime import date
 
-from escala_analyzer.domain.coverage_analyzer import CoverageAnalyzer
-from escala_analyzer.domain.models import ProjectState, ScheduleGroup, Shift
+from escala_analyzer.domain.analysis.coverage_analyzer import CoverageAnalyzer
+from escala_analyzer.domain.entities import ProjectState, ScheduleGroup, Shift
 
 
 def make_project() -> ProjectState:
@@ -83,3 +82,17 @@ def test_coverage_analyzer_accumulates_monthly_totals() -> None:
     assert result["monthly_scheduled"][(1, "shift-1")] == 4
     assert result["monthly_coverage_counts"][1] == 2
     assert result["monthly_peak_deficit"][1] == 1
+
+
+def test_daily_demand_override_takes_priority_over_weekday_demand() -> None:
+    project = make_project()
+    project.shifts[0].demand_by_date["2026-01-01"] = 5
+
+    result = CoverageAnalyzer().analyze(
+        project=project,
+        calendar_dates=[date(2026, 1, 1)],
+    )
+
+    shift = result["coverage_by_day"][0]["shifts"][0]
+    assert shift["required"] == 5
+    assert shift["deficit"] == 3

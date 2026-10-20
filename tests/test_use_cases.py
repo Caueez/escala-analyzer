@@ -1,10 +1,9 @@
-
 from datetime import date
 
 from escala_analyzer.application.use_cases.load_project import LoadProject
 from escala_analyzer.application.use_cases.reset_project import ResetProject
 from escala_analyzer.application.use_cases.save_project import SaveProject
-from escala_analyzer.domain.models import ProjectState, ScheduleGroup, Shift
+from escala_analyzer.domain.entities import ProjectState, ScheduleGroup, Shift
 
 
 class FakeProjectRepository:

@@ -1,12 +1,10 @@
-
 """Caso de uso para análise de um projeto de escala."""
 
-from typing import Any
-
-from escala_analyzer.domain.coverage_analyzer import CoverageAnalyzer
-from escala_analyzer.domain.models import ProjectState
-from escala_analyzer.domain.project_analyzer import ProjectAnalyzer
-from escala_analyzer.domain.schedule_rules_analyzer import ScheduleRulesAnalyzer
+from escala_analyzer.domain.analysis.coverage_analyzer import CoverageAnalyzer
+from escala_analyzer.domain.analysis.project_analyzer import ProjectAnalyzer
+from escala_analyzer.domain.analysis.schedule_rules_analyzer import ScheduleRulesAnalyzer
+from escala_analyzer.domain.contracts.analysis_contracts import ProjectAnalysis
+from escala_analyzer.domain.entities import ProjectState
 
 
 class AnalyzeProject:
@@ -22,5 +20,5 @@ class AnalyzeProject:
             rules_analyzer=rules_analyzer,
         )
 
-    def execute(self, project: ProjectState) -> dict[str, Any]:
+    def execute(self, project: ProjectState) -> ProjectAnalysis:
         return self._analyzer.analyze(project)

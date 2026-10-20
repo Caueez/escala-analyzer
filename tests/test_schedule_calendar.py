@@ -1,8 +1,7 @@
-
 from datetime import date
 
-from escala_analyzer.domain.models import ScheduleGroup
-from escala_analyzer.domain.schedule_calendar import ScheduleCalendar
+from escala_analyzer.domain.calendar.schedule_calendar import ScheduleCalendar
+from escala_analyzer.domain.entities import ScheduleGroup
 
 
 def make_group(
@@ -39,6 +38,7 @@ def test_cycle_handles_dates_before_anchor() -> None:
         date(2025, 12, 31),
     )
 
+
 def test_cycle_handles_working_day_before_anchor() -> None:
     group = make_group()
 
@@ -46,6 +46,23 @@ def test_cycle_handles_working_day_before_anchor() -> None:
         group,
         date(2025, 12, 29),
     )
+
+
+def test_weekday_anchor_keeps_three_by_one_phase_across_weeks() -> None:
+    group = make_group(work_days=3, rest_days=1)
+    group.cycle_anchor_weekday = 0  # segunda-feira
+
+    # 2024-01-01 é a referência de segunda: três dias de trabalho, um de folga.
+    assert [ScheduleCalendar.is_working(group, date(2024, 1, day)) for day in range(1, 9)] == [
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        False,
+    ]
 
 
 def test_override_takes_precedence_over_cycle() -> None:

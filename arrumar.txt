@@ -1,0 +1,1 @@
+adicionar horario de entrada e saida para cada grupo, e automatizar

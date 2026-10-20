@@ -1,111 +1,51 @@
-# Escala Visual
+# Escala Visual — 0.2.0rc1
 
-Editor web local de escalas de trabalho. Foi pensado inicialmente para ajudar a visualizar grupos por turno, ciclos de trabalho/folga e os efeitos desses ciclos sobre a cobertura de uma operação 24 horas por dia.
+Editor de escalas anuais com análise de cobertura, regras configuráveis e otimização por OR-Tools. Esta é uma **versão candidata para homologação SaaS**, com empresas isoladas, usuários e permissões, sessões seguras, persistência PostgreSQL e trabalhos assíncronos com RabbitMQ/Celery.
 
-> **Importante:** os números do projeto inicial são demonstrativos. A análise verifica os parâmetros que estiverem configurados; não é parecer jurídico nem certificação de conformidade trabalhista. Antes de aprovar uma escala, confirme a legislação vigente, a convenção/acordo coletivo aplicável e as regras específicas da categoria com o RH, sindicato ou assessoria jurídica.
+O domínio usa dataclasses e depende apenas da biblioteca padrão. Banco, autenticação, transporte HTTP e solucionadores ficam nas camadas externas. Resultados de otimização são propostas: não representam aprovação da escala e não alteram automaticamente o projeto.
 
-## Requisitos
+## Desenvolver localmente com Docker
 
-- Python 3.13 ou superior
-- [`uv`](https://docs.astral.sh/uv/)
-- Navegador moderno
-
-## Executar
-
-Abra o terminal dentro da pasta do projeto e rode:
+Todos os serviços rodam na sua máquina, sem provedor, domínio ou HTTPS. O comando abaixo prepara o `.env` para HTTP em `localhost`, incluindo as credenciais do banco e da mensageria. Execute a geração apenas na primeira configuração.
 
 ```bash
-uv sync
-uv run escala-visual
+python3 scripts/generate_env.py --development
+docker compose up --build -d
+docker compose exec app python -m escala_analyzer.cli provision \
+  --organization "Minha empresa" --email admin@suaempresa.com.br --name "Administrador"
 ```
 
-A aplicação ficará disponível em **http://127.0.0.1:8765**. Como o servidor escuta somente em `127.0.0.1`, por padrão ele não fica exposto à rede local.
+Informe a senha interativamente e abra [http://localhost:8000/login](http://localhost:8000/login). O script recusa sobrescrever `.env` e gera segredos exclusivos. Não há credenciais padrão nem cadastro público.
 
-Alternativa para desenvolvimento:
+O Compose inicia PostgreSQL, RabbitMQ, migrações, API, dispatcher e workers separados de análise e otimização. O usuário SQL da aplicação tem apenas permissões de dados; migrações usam outra credencial. Dados ficam em volumes próprios. **Não use `down -v` para atualizar um ambiente que contém dados.**
+
+Para HTTPS público e critérios antes de atender clientes, siga o [runbook](docs/runbook.md) e o [checklist de liberação](docs/release.md). O modo de desenvolvimento não deve ser exposto na internet.
+
+## Documentação
+
+- [Arquitetura, responsabilidades e decisões](docs/architecture.md)
+- [Regras estabilizadas e processo de alteração](docs/rules.md)
+- [API, autenticação, revisões e jobs](docs/api.md)
+- [Implantação, backup, restauração e incidentes](docs/runbook.md)
+- [Escopo e critérios da versão candidata](docs/release.md)
+- [Guia funcional preservado do editor local](docs/legacy-user-guide.md)
+
+## Desenvolvimento e verificações
 
 ```bash
 uv sync --extra dev
-uv run uvicorn escala_visual.main:app --reload --host 127.0.0.1 --port 8765
-```
-
-Para executar os testes:
-
-```bash
 uv run pytest
+uv run ruff check src tests migrations scripts
+uv run ruff format --check src tests migrations scripts
+uv run pyright --pythonpath .venv/bin/python src
 ```
 
-Para encerrar, use `Ctrl+C` no terminal.
+Os testes unitários de persistência usam SQLite isolado por teste; isso não substitui os testes reais de migração, concorrência e mensageria em PostgreSQL/RabbitMQ. O smoke de integração está em `scripts/smoke_saas.py`; execute apenas contra uma implantação Compose de teste, com o env-file e o nome de projeto correspondentes.
 
-## O que já funciona
+Para executar a API fora de containers, configure as conexões acessíveis ao host, execute `uv run alembic upgrade head` com a conexão da role de migrações e inicie `uv run uvicorn escala_analyzer.main:app` com a conexão da role de execução. Os comandos de dispatcher e workers estão no Compose/runbook.
 
-- **Linha do tempo mensal:** cada turno contém uma faixa por grupo, com cada dia marcado como trabalho ou folga.
-- **Ciclos configuráveis:** por exemplo, 3x1, 5x2, 4x2 ou outra combinação de dias trabalhados e de descanso.
-- **Fase do ciclo:** a data de referência é o primeiro dia trabalhado do ciclo. Mudar a data desloca o padrão no calendário.
-- **Ajustes manuais:** clique num dia para alternar trabalho/folga. Também é possível arrastar uma célula de folga sobre um dia de trabalho do mesmo grupo para deslocar uma folga. O ajuste é pontual e fica guardado no projeto.
-- **Demanda por turno e dia da semana:** configure quantas pessoas devem estar trabalhando em cada turno, inclusive demandas diferentes aos sábados e domingos.
-- **Análise anual:** expande os ciclos em todos os dias do ano e informa, entre outros itens, déficits por turno/dia, quantidade de folgas por mês, domingos de folga, sequências de trabalho e janelas móveis de sete dias.
-- **Dados locais:** os dados são gravados em `data/project.json` por padrão. O arquivo é criado na primeira execução.
-- **Importar/exportar projeto:** backup completo em JSON; exportação da cobertura anual em CSV, que pode ser aberta no Excel ou em outro editor de planilhas.
+## Compatibilidade local e migração
 
-## Fluxo sugerido
+O editor anterior continua disponível explicitamente com `ESCALA_MODE=local uv run uvicorn escala_analyzer.main:app --host 127.0.0.1`. Esse modo não possui autenticação, usa JSON e é recusado quando `ESCALA_ENVIRONMENT=production`. Não é montado junto com os endpoints SaaS.
 
-1. Abra **Configurações** e informe o ano que deseja avaliar.
-2. Corrija o nome do projeto, as horas efetivas por dia e a demanda de cada turno/dia da semana.
-3. Confira os grupos de exemplo. Edite, exclua ou crie grupos com a quantidade real de pessoas, ciclo e data inicial corretos.
-4. Na **Linha do tempo**, mude de mês e clique/arraste para fazer ajustes pontuais. Toda alteração é salva automaticamente.
-5. Abra **Análise anual** e filtre os achados de cobertura ou de regras.
-6. Exporte o CSV ou um backup JSON quando quiser guardar uma versão do planejamento.
-
-## Regras e perfis
-
-Os perfis são apenas pontos de partida para o cálculo:
-
-- **Referência base:** 44 horas e um dia de descanso por janela móvel de sete dias.
-- **Transição proposta:** 42 horas e dois dias de descanso por janela móvel de sete dias.
-- **Meta proposta:** 40 horas e dois dias de descanso por janela móvel de sete dias.
-
-Os números e condições de cada perfil podem ser editados. Os parâmetros “domingos de folga por mês” e “folgas mínimas no mês” também são configuráveis. A exigência de oito folgas mensais e a frequência de domingos foram colocadas como premissas de planejamento a confirmar para o caso concreto; o aplicativo não as declara automaticamente como uma interpretação jurídica definitiva.
-
-**Status legislativo na data desta versão (16/10/2026):** a PEC 221/2019 foi aprovada em dois turnos no Senado em 14/10/2026, mas as notícias consultadas em 15/10/2026 informavam que ainda faltava promulgação e publicação oficial. Portanto, o cenário de transição fica identificado como proposto, não como regra definitivamente vigente. Consulte as publicações oficiais mais recentes antes de definir a data de implementação.
-
-Referências para acompanhamento:
-
-- Agência Brasil — [Senado aprova o fim da escala 6x1 e redução da jornada](https://agenciabrasil.ebc.com.br/politica/noticia/2026-10/senado-aprova-fim-da-escala-6x1-e-reducao-da-jornada-de-trabalho)
-- Agência Brasil — [Fim da 6x1: saiba quando entra em vigor a nova jornada](https://agenciabrasil.ebc.com.br/politica/noticia/2026-10/fim-da-6x1-saiba-quando-entra-em-vigor-nova-jornada-de-trabalho)
-- UOL — [Prazos previstos para a proposta](https://economia.uol.com.br/noticias/redacao/2026/10/15/senado-aprova-fim-da-escala-6x1-entenda-quando-comeca-a-valer-a-5x2.ghtm)
-
-## Como o cálculo funciona
-
-Para cada grupo, o motor calcula a posição do dia dentro do ciclo de `dias de trabalho + dias de folga`, usando a data de referência. Uma alteração manual substitui o estado calculado apenas naquela data. Depois, o sistema soma as pessoas dos grupos em trabalho em cada turno e compara o resultado com a demanda configurada.
-
-Os critérios de descanso são conferidos individualmente por grupo, porque todos os trabalhadores do mesmo grupo compartilham o mesmo padrão de datas. Isso permite localizar problemas de calendário, mas não avalia regras individuais que não estejam representadas no modelo — por exemplo, acordos particulares, férias, afastamentos, feriados específicos, limites de intervalo entre jornadas por horário real, funções com regime diferenciado ou restrições sindicais adicionais.
-
-## Estrutura do projeto
-
-```text
-src/escala_visual/
-├── main.py                       # API e servidor web local
-├── domain/
-│   ├── models.py                 # Modelos e validação de dados
-│   ├── sample_data.py            # Projeto inicial demonstrativo
-│   └── analyzer.py               # Cálculo dos ciclos e análise anual
-├── infrastructure/
-│   └── json_repository.py        # Persistência local em JSON
-└── web/
-    ├── index.html                # Interface
-    ├── styles.css                # Estilos responsivos
-    └── app.js                    # Interações da interface
-
-tests/
-└── test_analyzer.py              # Testes do motor de cálculo
-```
-
-## Limitações deliberadas da primeira versão
-
-- Não gera automaticamente a melhor escala nem recomenda contratações; mostra a cobertura da escala que foi desenhada manualmente.
-- Os ajustes arrastados são exceções por data; ainda não são uma regra recorrente automática do tipo “sempre no último domingo do mês”.
-- Não importa a planilha atual automaticamente.
-- Não faz validação jurídica oficial e não substitui a aprovação sindical.
-- A análise de horas trata os dias trabalhados como blocos de `horas/dia` configurados por turno. Não calcula ainda horários de entrada/saída, intervalo intrajornada ou intervalo interjornada a partir de horários reais.
-
-Essas limitações ficam separadas do núcleo do cálculo para permitir evoluir o projeto sem acoplar as regras específicas da fiação ao programa.
+Os arquivos locais não são migrados automaticamente nem apagados. Importe o backup na empresa correta pela interface ou pela CLI documentada. A importação SaaS acrescenta cópias com IDs novos, preservando os documentos anteriores.
